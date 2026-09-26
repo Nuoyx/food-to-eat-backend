@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 
 import lombok.Data;
 
-public class RecommendationHistory implements Serializable {
+public class Recommendation implements Serializable {
     private Long id;
     private Long userId;
     private Long questionId;

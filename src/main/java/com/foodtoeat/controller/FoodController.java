@@ -12,8 +12,11 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/food")
 public class FoodController {
 
-    @Autowired
-    private FoodService foodService;
+    private final FoodService foodService;
+
+    public FoodController(FoodService foodService) {
+        this.foodService = foodService;
+    }
 
     @GetMapping
     public Result<PageResult> getFood(FoodPageQueryDTO foodPageQueryDTO){

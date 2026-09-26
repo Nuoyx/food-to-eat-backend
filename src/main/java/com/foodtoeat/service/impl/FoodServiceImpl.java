@@ -5,6 +5,8 @@ import com.foodtoeat.pojo.entity.Food;
 import com.foodtoeat.service.FoodService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import java.util.Random;
+
 
 @Service
 public class FoodServiceImpl implements FoodService{
@@ -26,5 +28,12 @@ public class FoodServiceImpl implements FoodService{
     @Override
     public Food[] getFoodBySearch(String keyword) {
         return foodMapper.getFoodBySearch(keyword);
+    }
+
+    @Override
+    public Food random() {
+        int total = foodMapper.count();
+        int targetId = Random.nextInt(1, total);
+        return foodMapper.getFoodById(targetId);
     }
 }

@@ -11,4 +11,6 @@ public interface FoodService {
     Food getFoodById(Integer id);
 
     Food[] getFoodBySearch(String keyword);
+
+    Food random();
 }
