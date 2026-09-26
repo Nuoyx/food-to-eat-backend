@@ -9,10 +9,12 @@ import org.apache.ibatis.annotations.Select;
 public interface FoodMapper {
     Page<Food> pageQuery(FoodPageQueryDTO foodPageQueryDTO);
 
-    @Select("select * from food where id = #{id}")
+    @Select("select * from foods where id = #{id}")
     Food getFoodById(Integer id);
 
-    @Select("select * from food where name like concat('%',#{keyword},'%')")
+    @Select("select * from foods where name like concat('%',#{keyword},'%')")
     Food[] getFoodBySearch(String keyword);
 
+    @Select("select count(*) from foods")
+    int count();
 }
