@@ -1,4 +1,12 @@
 package com.foodtoeat.pojo.entity;
 
-public class Food {
+import lombok.Data;
+
+import java.io.Serializable;
+
+public class Food implements Serializable{
+    private Long id;
+    private String name;
+    private String description;
+    private String imageUrl;
 }
