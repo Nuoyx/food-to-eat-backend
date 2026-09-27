@@ -1,6 +1,7 @@
 package com.foodtoeat.controller;
 
 
+import com.foodtoeat.pojo.dto.FoodDeciderAcceptDTO;
 import com.foodtoeat.pojo.dto.FoodDeciderRequestDTO;
 import com.foodtoeat.pojo.dto.FoodRecommendationRejectDTO;
 import com.foodtoeat.pojo.entity.Food;
@@ -8,8 +9,11 @@ import com.foodtoeat.pojo.vo.FoodDeciderResponseVO;
 import com.foodtoeat.result.Result;
 import com.foodtoeat.service.FoodService;
 import com.foodtoeat.service.RecommendationService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -17,14 +21,11 @@ import java.util.UUID;
 public class RecommendationController {
 
     private final RecommendationService recommendationService;
-    private final FoodService foodService;
 
     public RecommendationController(
-            RecommendationService recommendationService,
-            FoodService foodService
+            RecommendationService recommendationService
     ) {
         this.recommendationService = recommendationService;
-        this.foodService = foodService;
     }
 
     @PostMapping("/decide/start")
@@ -55,13 +56,13 @@ public class RecommendationController {
 
     @PostMapping("/decide/accept")
     public void acceptRecommendation(
-            @RequestBody UUID sessionId) {
-        recommendationService.acceptRecommendation(sessionId);
+            @RequestBody FoodDeciderAcceptDTO request) {
+        recommendationService.acceptRecommendation(request.getSessionId());
     }
 
     @GetMapping("/random")
     public Result<Food> getRandom(){
-        return Result.success(foodService.random());
+        return Result.success(recommendationService.random());
     }
 
 }

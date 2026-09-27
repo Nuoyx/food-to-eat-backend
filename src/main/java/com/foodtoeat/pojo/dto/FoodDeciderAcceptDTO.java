@@ -5,9 +5,6 @@ import lombok.Data;
 import java.util.UUID;
 
 @Data
-public class FoodRecommendationRejectDTO {
-
+public class FoodDeciderAcceptDTO {
     private UUID sessionId;
-
-    private Integer foodId;
 }
