@@ -4,18 +4,19 @@
 <mapper namespace="com.foodtoeat.mapper.FoodMapper">
 
     <select id="pageQuery" resultType="com.foodtoeat.pojo.entity.Food">
-        SELECT * FROM food
+        SELECT * FROM foods
         order by name desc
-        limit #{page}, #{pageSize}
+        LIMIT #{pageSize}
+        OFFSET #{offset}
     </select>
     <select id="getFoodByCategory"
             parameterType="com.foodtoeat.pojo.dto.FoodCategoryFilterDTO"
             resultType="com.foodtoeat.pojo.entity.Food">
-        SELECT * FROM food
+        SELECT * FROM foods
         <where>
             <!-- Include foods with ALL included categories -->
             <if test="includeCategoryIds != null and includeCategoryIds.size() > 0">
-                food.id IN (
+                foods.id IN (
                 SELECT fc.food_id
                 FROM food_category fc
                 WHERE fc.category_id IN
@@ -34,7 +35,7 @@
 
             <!-- Exclude foods with any excluded category -->
             <if test="excludeCategoryIds != null and excludeCategoryIds.size() > 0">
-                AND food.id NOT IN (
+                AND foods.id NOT IN (
                 SELECT fc.food_id
                 FROM food_category fc
                 WHERE fc.category_id IN
@@ -50,7 +51,7 @@
 
             <!-- Exclude foods already rejected during this session -->
             <if test="rejectedFoodIds != null and rejectedFoodIds.size() > 0">
-                AND food.id NOT IN
+                AND foods.id NOT IN
                 <foreach collection="rejectedFoodIds"
                          item="foodId"
                          open="("

@@ -7,14 +7,8 @@ import com.foodtoeat.pojo.dto.FoodRecommendationRejectDTO;
 import com.foodtoeat.pojo.entity.Food;
 import com.foodtoeat.pojo.vo.FoodDeciderResponseVO;
 import com.foodtoeat.result.Result;
-import com.foodtoeat.service.FoodService;
 import com.foodtoeat.service.RecommendationService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Set;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/recommendation")
@@ -30,8 +24,6 @@ public class RecommendationController {
 
     @PostMapping("/decide/start")
     public Result<FoodDeciderResponseVO> startDecision() {
-
-        log.info("Starting new food decision session");
 
         FoodDeciderResponseVO response = recommendationService.startDecision();
 

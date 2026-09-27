@@ -13,7 +13,7 @@ public class RedisConfiguration {
     @Bean
     public RedisTemplate<String, Object> redisTemplate(
             RedisConnectionFactory redisConnectionFactory,
-            org.springframework.boot.autoconfigure.data.redis.RedisProperties redisProperties) {
+            org.springframework.boot.data.redis.autoconfigure.DataRedisProperties redisProperties) {
 
         log.info("Redis host: {}", redisProperties.getHost());
         log.info("Redis port: {}", redisProperties.getPort());
