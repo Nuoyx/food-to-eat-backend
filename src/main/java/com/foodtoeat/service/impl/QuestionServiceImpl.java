@@ -1,9 +1,7 @@
 package com.foodtoeat.service.impl;
 
 
-import com.foodtoeat.mapper.FoodMapper;
 import com.foodtoeat.mapper.QuestionMapper;
-import com.foodtoeat.pojo.dto.FoodCategoryFilterDTO;
 import com.foodtoeat.pojo.entity.Question;
 import com.foodtoeat.service.QuestionService;
 import org.springframework.stereotype.Service;
