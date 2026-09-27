@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.foodtoeat.mapper.QuestionMapper">
+    <select id="getNextQuestion"
+            parameterType="java.util.List"
+            resultType="com.foodtoeat.pojo.entity.Question">
+        SELECT * FROM questions
+        <where>
+            <if test="askedQuestionIds != null and askedQuestionIds.size() > 0">
+                id NOT IN
+                <foreach collection="askedQuestionIds"
+                         item="questionId"
+                         open="("
+                         separator=","
+                         close=")">
+                    #{questionId}
+                </foreach>
+            </if>
+        </where>
+    </select>
+</mapper>
+

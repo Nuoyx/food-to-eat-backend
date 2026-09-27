@@ -8,4 +8,57 @@
         order by name desc
         limit #{page}, #{pageSize}
     </select>
+    <select id="getFoodByCategory"
+            parameterType="com.foodtoeat.pojo.dto.FoodCategoryFilterDTO"
+            resultType="com.foodtoeat.pojo.entity.Food">
+        SELECT * FROM food
+        <where>
+            <!-- Include foods with ALL included categories -->
+            <if test="includeCategoryIds != null and includeCategoryIds.size() > 0">
+                food.id IN (
+                SELECT fc.food_id
+                FROM food_category fc
+                WHERE fc.category_id IN
+                <foreach collection="includeCategoryIds"
+                         item="categoryId"
+                         open="("
+                         separator=","
+                         close=")">
+                    #{categoryId}
+                </foreach>
+                GROUP BY fc.food_id
+                HAVING COUNT(DISTINCT fc.category_id)
+                = #{includeCategoryIds.size}
+                )
+            </if>
+
+            <!-- Exclude foods with any excluded category -->
+            <if test="excludeCategoryIds != null and excludeCategoryIds.size() > 0">
+                AND food.id NOT IN (
+                SELECT fc.food_id
+                FROM food_category fc
+                WHERE fc.category_id IN
+                <foreach collection="excludeCategoryIds"
+                         item="categoryId"
+                         open="("
+                         separator=","
+                         close=")">
+                    #{categoryId}
+                </foreach>
+                )
+            </if>
+
+            <!-- Exclude foods already rejected during this session -->
+            <if test="rejectedFoodIds != null and rejectedFoodIds.size() > 0">
+                AND food.id NOT IN
+                <foreach collection="rejectedFoodIds"
+                         item="foodId"
+                         open="("
+                         separator=","
+                         close=")">
+                    #{foodId}
+                </foreach>
+            </if>
+        </where>
+    </select>
 </mapper>

@@ -8,6 +8,8 @@ import com.foodtoeat.service.FoodService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/food")
 public class FoodController {
@@ -30,7 +32,7 @@ public class FoodController {
     }
 
     @GetMapping("/foods/search")
-    public Result<Food[]> getFoodBySearch(@RequestParam String keyword){
+    public Result<List<Food>> getFoodBySearch(@RequestParam String keyword){
         return Result.success(foodService.getFoodBySearch(keyword));
     }
 

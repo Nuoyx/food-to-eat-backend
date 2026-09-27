@@ -2,6 +2,7 @@ package com.foodtoeat.service;
 
 import com.foodtoeat.pojo.dto.FoodDeciderRequestDTO;
 import com.foodtoeat.pojo.dto.FoodRecommendationRejectDTO;
+import com.foodtoeat.pojo.entity.Food;
 import com.foodtoeat.pojo.vo.FoodDeciderResponseVO;
 
 import java.util.UUID;
@@ -14,4 +15,6 @@ public interface RecommendationService {
     FoodDeciderResponseVO rejectRecommendation(FoodRecommendationRejectDTO foodRecommendationRejectDTO);
 
     void acceptRecommendation(UUID sessionId);
+
+    Food random();
 }
