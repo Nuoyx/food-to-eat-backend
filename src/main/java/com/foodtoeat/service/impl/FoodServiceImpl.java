@@ -42,14 +42,15 @@ public class FoodServiceImpl implements FoodService{
     @Override
     public Food getFoodByCategory(FoodCategoryFilterDTO foodCategoryFilterDTO) {
         List<Food> foods = foodMapper.getFoodByCategory(foodCategoryFilterDTO);
-        int targetId = random.nextInt(1, foods.size());
+        if (foods.isEmpty()) {
+            return null;
+        }
+        int targetId = random.nextInt(foods.size());
         return foods.get(targetId);
     }
 
     @Override
     public Food random() {
-        Integer total = foodMapper.count();
-        Integer targetId = random.nextInt(1, total);
-        return foodMapper.getFoodById(targetId);
+        return foodMapper.getRandomFood();
     }
 }

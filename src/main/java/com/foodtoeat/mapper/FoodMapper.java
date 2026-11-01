@@ -22,5 +22,8 @@ public interface FoodMapper {
     @Select("select count(*) from foods")
     Integer count();
 
+    @Select("SELECT * FROM foods ORDER BY RANDOM() LIMIT 1")
+    Food getRandomFood();
+
     List<Food> getFoodByCategory(FoodCategoryFilterDTO foodCategoryFilterDTO);
 }
