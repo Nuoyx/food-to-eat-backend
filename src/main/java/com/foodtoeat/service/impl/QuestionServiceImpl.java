@@ -5,6 +5,8 @@ import com.foodtoeat.mapper.QuestionMapper;
 import com.foodtoeat.pojo.entity.Question;
 import com.foodtoeat.service.QuestionService;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Random;
@@ -28,7 +30,12 @@ public class QuestionServiceImpl implements QuestionService {
 
     @Override
     public Integer getCategoryIdByQuestionId(Integer questionId) {
-        return 0;
+        if (questionId == null || questionId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "A positive question ID is required");
+        }
+
+        return questionMapper.getCategoryIdByQuestionId(questionId);
     }
 
     @Override
