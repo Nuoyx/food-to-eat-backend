@@ -1,13 +1,12 @@
 package com.foodtoeat.pojo.vo;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import com.foodtoeat.pojo.entity.DecisionSession.Stage;
+import com.foodtoeat.pojo.entity.Food;
+import com.foodtoeat.pojo.entity.Question;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-
-import com.foodtoeat.pojo.entity.Question;
-import com.foodtoeat.pojo.entity.Food;
-
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import java.util.UUID;
 
 @Data
@@ -16,6 +15,7 @@ import java.util.UUID;
 @Builder
 public class FoodDeciderResponseVO {
     private UUID sessionId;
+    private Stage stage;
     private Question question;
     private Food recommendation;
 }

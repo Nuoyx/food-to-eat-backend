@@ -12,16 +12,7 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 public class RedisConfiguration {
     @Bean
     public RedisTemplate<String, Object> redisTemplate(
-            RedisConnectionFactory redisConnectionFactory,
-            org.springframework.boot.data.redis.autoconfigure.DataRedisProperties redisProperties) {
-
-        log.info("Redis host: {}", redisProperties.getHost());
-        log.info("Redis port: {}", redisProperties.getPort());
-        log.info("Redis database: {}", redisProperties.getDatabase());
-        log.info("Redis password: {}", redisProperties.getPassword());
-        log.info("Redis password configured: {}",
-                redisProperties.getPassword() != null);
-
+            RedisConnectionFactory redisConnectionFactory) {
 
         RedisTemplate<String, Object> redisTemplate = new RedisTemplate<>();
         redisTemplate.setConnectionFactory(redisConnectionFactory);

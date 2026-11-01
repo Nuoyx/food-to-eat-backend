@@ -3,32 +3,38 @@ package com.foodtoeat.service.impl;
 import com.foodtoeat.pojo.dto.FoodCategoryFilterDTO;
 import com.foodtoeat.pojo.dto.FoodDeciderRequestDTO;
 import com.foodtoeat.pojo.dto.FoodRecommendationRejectDTO;
+import com.foodtoeat.pojo.entity.DecisionSession;
+import com.foodtoeat.pojo.entity.DecisionSession.Stage;
 import com.foodtoeat.pojo.entity.Food;
 import com.foodtoeat.pojo.entity.Question;
 import com.foodtoeat.pojo.vo.FoodDeciderResponseVO;
 import com.foodtoeat.service.FoodService;
 import com.foodtoeat.service.QuestionService;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.stereotype.Service;
 import com.foodtoeat.service.RecommendationService;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 @Service
-public class RecommendationServiceImpl implements RecommendationService{
-
-    private static final String KEY_RECOMMENDATION = "recommendation:";
+public class RecommendationServiceImpl implements RecommendationService {
+    private static final String SESSION_PREFIX = "recommendation:";
     private static final Duration SESSION_TTL = Duration.ofMinutes(30);
+
     private final QuestionService questionService;
     private final FoodService foodService;
     private final RedisTemplate<String, Object> redisTemplate;
 
-    public RecommendationServiceImpl(
-            QuestionService questionService,
-            FoodService foodService,
-            RedisTemplate<String, Object> redisTemplate
-    ) {
+    public RecommendationServiceImpl(QuestionService questionService,
+                                     FoodService foodService,
+                                     RedisTemplate<String, Object> redisTemplate) {
         this.questionService = questionService;
         this.foodService = foodService;
         this.redisTemplate = redisTemplate;
@@ -36,130 +42,63 @@ public class RecommendationServiceImpl implements RecommendationService{
 
     @Override
     public FoodDeciderResponseVO startDecision() {
-        // 1. Generate a unique session ID
-        UUID sessionId = UUID.randomUUID();
-
-        String questionKey = getQuestionKey(sessionId);
-        String rejectedKey = getRejectedKey(sessionId);
-        String answersKey = getAnswersKey(sessionId);
-
-        // Create empty state
-        List<Integer> askedQuestionIds = new ArrayList<>();
-        List<Integer> rejectedFoodIds = new ArrayList<>();
-        List<Integer> questionAnswers = new ArrayList<>();
-
-        // Get first question
         Question question = questionService.getFirstQuestion();
 
-        askedQuestionIds.add(question.getId());
+        UUID sessionId = UUID.randomUUID();
+        DecisionSession session = new DecisionSession();
 
-        // Store state in Redis
-        redisTemplate.opsForValue().set(
-                questionKey,
-                askedQuestionIds,
-                SESSION_TTL
-        );
-
-        redisTemplate.opsForValue().set(
-                rejectedKey,
-                rejectedFoodIds,
-                SESSION_TTL
-        );
-
-        redisTemplate.opsForValue().set(
-                answersKey,
-                questionAnswers,
-                SESSION_TTL
-        );
-
-        return FoodDeciderResponseVO.builder()
-                .sessionId(sessionId)
-                .question(question)
-                .recommendation(null)
-                .build();
+        session.setCurrentQuestionId(question.getId());
+        saveSession(sessionId, session);
+        return response(sessionId, session, question, null);
     }
 
     @Override
-    public FoodDeciderResponseVO answerQuestion(FoodDeciderRequestDTO foodDeciderRequestDTO) {
-        UUID sessionId = foodDeciderRequestDTO.getSessionId();
-
-        String questionKey = getQuestionKey(sessionId);
-        String rejectedKey = getRejectedKey(sessionId);
-        String answersKey = getAnswersKey(sessionId);
-        List<Integer> askedQuestionIds = getList(questionKey);
-        List<Integer> rejectedFoodIds = getList(rejectedKey);
-        List<Boolean> questionAnswers = getList(answersKey);
-
-        if (askedQuestionIds.isEmpty()) {
-            // session expired or does not exist
-            return startDecision();
+    public FoodDeciderResponseVO answerQuestion(FoodDeciderRequestDTO request) {
+        if (request == null || request.getAnswer() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Answer is required");
         }
-        questionAnswers.add(foodDeciderRequestDTO.getAnswer());
-        FoodCategoryFilterDTO foodCategoryFilterDTO = buildFoodCategoryFilter(
-                askedQuestionIds,
-                questionAnswers,
-                rejectedFoodIds
-        );
+        UUID sessionId = request.getSessionId();
+        DecisionSession session = loadSession(sessionId);
 
-        Food food = foodService.getFoodByCategory(foodCategoryFilterDTO);
-
-        return FoodDeciderResponseVO.builder()
-                .sessionId(sessionId)
-                .question(null)
-                .recommendation(food)
-                .build();
+        Integer questionId = session.getCurrentQuestionId();
+        if (questionId == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "There is no question waiting for an answer");
+        }
+        // Keep earlier preferences and associate this answer with the pending question.
+        session.getAnswers().put(questionId, request.getAnswer());
+        Food recommendation = foodService.getFoodByCategory(buildFilter(session));
+        // The question is complete; feedback is only valid if a food was found.
+        session.setCurrentQuestionId(null);
+        session.setStage(recommendation == null ? Stage.EXHAUSTED : Stage.AWAITING_FEEDBACK);
+        saveSession(sessionId, session);
+        return response(sessionId, session, null, recommendation);
     }
 
     @Override
-    public FoodDeciderResponseVO rejectRecommendation(FoodRecommendationRejectDTO foodRecommendationRejectDTO) {
-        UUID sessionId = foodRecommendationRejectDTO.getSessionId();
-
-        String questionKey = getQuestionKey(sessionId);
-        String rejectedKey = getRejectedKey(sessionId);
-
-        List<Integer> rejectedFoodIds = getList(rejectedKey);
-        List<Integer> askedQuestionIds = getList(questionKey);
-
-        if (askedQuestionIds.isEmpty()) {
-            // session expired or does not exist
-            return startDecision();
+    public FoodDeciderResponseVO rejectRecommendation(FoodRecommendationRejectDTO request) {
+        if (request == null || request.getFoodId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Rejected food ID is required");
         }
+        UUID sessionId = request.getSessionId();
+        DecisionSession session = loadSession(sessionId);
 
-        rejectedFoodIds.add(foodRecommendationRejectDTO.getFoodId());
-        Question nextQuestion = questionService.getNextQuestion(askedQuestionIds);
-
-        redisTemplate.opsForValue().set(
-                questionKey,
-                askedQuestionIds,
-                SESSION_TTL
-        );
-
-        redisTemplate.opsForValue().set(
-                rejectedKey,
-                rejectedFoodIds,
-                SESSION_TTL
-        );
-
-        return FoodDeciderResponseVO.builder()
-                .sessionId(sessionId)
-                .question(nextQuestion)
-                .recommendation(null)
-                .build();
+        session.getRejectedFoodIds().add(request.getFoodId());
+        // Answered question IDs also serve as the list of questions to avoid repeating.
+        Question next = questionService.getNextQuestion(
+                new ArrayList<>(session.getAnswers().keySet()));
+        // Save the new pending question, or explicitly end the flow if none remain.
+        session.setCurrentQuestionId(next == null ? null : next.getId());
+        session.setStage(next == null ? Stage.EXHAUSTED : Stage.AWAITING_ANSWER);
+        saveSession(sessionId, session);
+        return response(sessionId, session, next, null);
     }
 
     @Override
     public void acceptRecommendation(UUID sessionId) {
-        redisTemplate.delete(
-                getQuestionKey(sessionId)
-        );
-
-        redisTemplate.delete(
-                getRejectedKey(sessionId)
-        );
-
-        redisTemplate.delete(
-                getAnswersKey(sessionId)
-        );
+        // Acceptance completes the flow, so its temporary state is no longer needed.
+        redisTemplate.delete(sessionKey(sessionId));
     }
 
     @Override
@@ -167,64 +106,64 @@ public class RecommendationServiceImpl implements RecommendationService{
         return foodService.random();
     }
 
-
-    @SuppressWarnings("unchecked")
-    private <T> List<T> getList(String key) {
-        List<T> list = (List<T>) redisTemplate
-                .opsForValue()
-                .get(key);
-
-        return list != null ? list : new ArrayList<>();
+    private DecisionSession loadSession(UUID sessionId) {
+        if (sessionId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Session ID is required");
+        }
+        Object stored = redisTemplate.opsForValue().get(sessionKey(sessionId));
+        if (stored == null) {
+            // Do not silently replace an expired session and discard the user's action.
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Session not found or expired; start a new decision");
+        }
+        if (!(stored instanceof DecisionSession)) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Stored session has an unexpected format");
+        }
+        return (DecisionSession) stored;
     }
 
-    private String getQuestionKey(UUID sessionId) {
-
-        return sessionId
-                + KEY_RECOMMENDATION
-                + ":questions";
+    private void saveSession(UUID sessionId, DecisionSession session) {
+        // Redis reads return a deserialized copy: local changes require an explicit save.
+        // Each successful transition refreshes the entire session's 30-minute expiry.
+        redisTemplate.opsForValue().set(sessionKey(sessionId), session, SESSION_TTL);
     }
 
-    private String getRejectedKey(UUID sessionId) {
-
-        return sessionId
-                + KEY_RECOMMENDATION
-                + ":rejected";
+    private String sessionKey(UUID sessionId) {
+        return SESSION_PREFIX + sessionId;
     }
 
-    private String getAnswersKey(UUID sessionId) {
-
-        return sessionId
-                + KEY_RECOMMENDATION
-                + ":answers";
-    }
-
-    private FoodCategoryFilterDTO buildFoodCategoryFilter(
-            List<Integer> askedQuestionIds,
-            List<Boolean> questionAnswers,
-            List<Integer> rejectedFoodIds
-    ) {
-        List<Integer> includeCategoryIds = new ArrayList<>();
-        List<Integer> excludeCategoryIds = new ArrayList<>();
-
-        for (int i = 0; i < askedQuestionIds.size(); i++) {
-
-            Integer questionId = askedQuestionIds.get(i);
-            Boolean answer = questionAnswers.get(i);
-
-            Integer categoryId =
-                    questionService.getCategoryIdByQuestionId(questionId);
-
-            if (answer) {
-                includeCategoryIds.add(categoryId);
+    private FoodCategoryFilterDTO buildFilter(DecisionSession session) {
+        // Multiple questions may map to the same category; filters need unique IDs.
+        Set<Integer> included = new LinkedHashSet<>();
+        Set<Integer> excluded = new LinkedHashSet<>();
+        for (Map.Entry<Integer, Boolean> answer : session.getAnswers().entrySet()) {
+            Integer categoryId = questionService.getCategoryIdByQuestionId(answer.getKey());
+            if (categoryId == null) {
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                        "Answered question has no category");
+            }
+            // Yes requires the category; no excludes the category
+            if (answer.getValue()) {
+                included.add(categoryId);
             } else {
-                excludeCategoryIds.add(categoryId);
+                excluded.add(categoryId);
             }
         }
-
         return FoodCategoryFilterDTO.builder()
-                .includeCategoryIds(includeCategoryIds)
-                .excludeCategoryIds(excludeCategoryIds)
-                .rejectedFoodIds(rejectedFoodIds)
+                .includeCategoryIds(new ArrayList<>(included))
+                .excludeCategoryIds(new ArrayList<>(excluded))
+                .rejectedFoodIds(new ArrayList<>(session.getRejectedFoodIds()))
+                .build();
+    }
+
+    private FoodDeciderResponseVO response(UUID sessionId, DecisionSession session,
+                                           Question question, Food food) {
+        return FoodDeciderResponseVO.builder()
+                .sessionId(sessionId)
+                .stage(session.getStage())
+                .question(question)
+                .recommendation(food)
                 .build();
     }
 }

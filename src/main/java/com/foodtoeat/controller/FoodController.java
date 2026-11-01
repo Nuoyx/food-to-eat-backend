@@ -5,7 +5,6 @@ import com.foodtoeat.pojo.entity.Food;
 import com.foodtoeat.result.PageResult;
 import com.foodtoeat.result.Result;
 import com.foodtoeat.service.FoodService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;

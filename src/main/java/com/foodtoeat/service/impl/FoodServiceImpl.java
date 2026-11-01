@@ -5,7 +5,6 @@ import com.foodtoeat.pojo.dto.FoodPageQueryDTO;
 import com.foodtoeat.pojo.entity.Food;
 import com.foodtoeat.result.PageResult;
 import com.foodtoeat.service.FoodService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 
@@ -16,9 +15,12 @@ import java.util.Random;
 @Service
 public class FoodServiceImpl implements FoodService{
 
-    @Autowired
-    private FoodMapper foodMapper;
+    private final FoodMapper foodMapper;
     Random random = new Random();
+
+    public FoodServiceImpl(FoodMapper foodMapper) {
+        this.foodMapper = foodMapper;
+    }
 
 
     @Override
