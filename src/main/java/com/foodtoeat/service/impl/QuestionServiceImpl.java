@@ -9,11 +9,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.Random;
 
 @Service
 public class QuestionServiceImpl implements QuestionService {
-    Random random = new Random();
     private final QuestionMapper questionMapper;
 
     public QuestionServiceImpl(QuestionMapper questionMapper) {
@@ -23,9 +21,7 @@ public class QuestionServiceImpl implements QuestionService {
 
     @Override
     public Question getFirstQuestion() {
-        int total = questionMapper.count();
-        int targetId = random.nextInt(1, total);
-        return questionMapper.getQuestionById(targetId);
+        return questionMapper.getRandomQuestion();
     }
 
     @Override

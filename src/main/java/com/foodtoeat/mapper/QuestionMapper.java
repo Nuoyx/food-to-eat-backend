@@ -8,6 +8,9 @@ import java.util.List;
 
 @Mapper
 public interface QuestionMapper {
+    @Select("SELECT * FROM questions ORDER BY RANDOM() LIMIT 1")
+    Question getRandomQuestion();
+
     @Select("select count(*) from questions")
     int count();
 
