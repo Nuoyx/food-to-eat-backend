@@ -1,0 +1,8 @@
+# Build on a workstation/CI, not the 2 GB server. Keep the repos side by side.
+services:
+  backend:
+    build:
+      context: ..
+  frontend:
+    build:
+      context: ../../food-to-eat-frontend

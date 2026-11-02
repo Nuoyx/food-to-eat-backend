@@ -1,0 +1,23 @@
+server:
+  port: 8080
+  forward-headers-strategy: framework
+  shutdown: graceful
+
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 8
+      minimum-idle: 1
+      connection-timeout: 10000
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+      connect-timeout: 3s
+      timeout: 3s
+      lettuce:
+        shutdown-timeout: 1s

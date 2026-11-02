@@ -1,0 +1,10 @@
+.git
+.idea
+.vscode
+target
+deploy
+database
+.env*
+*.log
+src/main/resources/application-dev.yml
+src/main/resources/application-local.yml

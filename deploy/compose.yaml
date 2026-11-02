@@ -1,0 +1,105 @@
+name: food-to-eat
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "5m"
+    max-file: "2"
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    mem_limit: 384m
+    environment:
+      POSTGRES_DB: food_to_eat
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      APP_DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+    command: ["postgres", "-c", "shared_buffers=64MB", "-c", "max_connections=20", "-c", "work_mem=4MB", "-c", "maintenance_work_mem=32MB"]
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./grant-app-access.sh:/opt/grant-app-access.sh:ro
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d food_to_eat"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    mem_limit: 128m
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
+    # Redis holds temporary sessions. A restart ends them; no catalog data is here.
+    command:
+      - sh
+      - -c
+      - exec redis-server --requirepass "$${REDIS_PASSWORD}" --maxmemory 64mb --maxmemory-policy noeviction --appendonly no --save ''
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$${REDIS_PASSWORD}\" redis-cli ping | grep -qx PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  backend:
+    image: ${BACKEND_IMAGE:?Set BACKEND_IMAGE}
+    restart: unless-stopped
+    mem_limit: 640m
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://postgres:5432/food_to_eat
+      DB_USERNAME: food_to_eat_app
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
+      JAVA_TOOL_OPTIONS: "-Xms64m -Xmx320m -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=64m -XX:+ExitOnOutOfMemoryError"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    networks: [web, data]
+    stop_grace_period: 30s
+    logging: *logging
+
+  frontend:
+    image: ${FRONTEND_IMAGE:?Set FRONTEND_IMAGE}
+    restart: unless-stopped
+    mem_limit: 64m
+    depends_on:
+      backend: { condition: service_healthy }
+    networks: [web]
+    logging: *logging
+
+  edge:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    mem_limit: 64m
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN to your app hostname}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      frontend: { condition: service_healthy }
+    networks: [web]
+    logging: *logging
+
+networks:
+  web:
+  data:
+    internal: true
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
