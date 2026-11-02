@@ -34,3 +34,9 @@ build/
 
 ### Spring Boot ###
 src/main/resources/application-dev.yml
+
+# Deployment credentials and database backups
+deploy/.env
+deploy/.env.*
+!deploy/.env.example
+deploy/backups/
