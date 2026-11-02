@@ -1,0 +1,16 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: food-to-eat-backend
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/food_to_eat}
+    username: ${DB_USERNAME:${nuoy.datasource.username}}
+    password: ${DB_PASSWORD:${nuoy.datasource.password}}
+    driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      host: ${REDIS_HOST:${nuoy.redis.host:localhost}}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:${nuoy.redis.password:}}
