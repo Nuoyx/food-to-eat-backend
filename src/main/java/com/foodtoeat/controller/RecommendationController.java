@@ -4,7 +4,7 @@ package com.foodtoeat.controller;
 import com.foodtoeat.pojo.dto.FoodDeciderAcceptDTO;
 import com.foodtoeat.pojo.dto.FoodDeciderRequestDTO;
 import com.foodtoeat.pojo.dto.FoodRecommendationRejectDTO;
-import com.foodtoeat.pojo.entity.Food;
+import com.foodtoeat.pojo.vo.FoodVO;
 import com.foodtoeat.pojo.vo.FoodDeciderResponseVO;
 import com.foodtoeat.result.Result;
 import com.foodtoeat.service.RecommendationService;
@@ -53,7 +53,7 @@ public class RecommendationController {
     }
 
     @GetMapping("/random")
-    public Result<Food> getRandom(){
+    public Result<FoodVO> getRandom(){
         return Result.success(recommendationService.random());
     }
 

@@ -3,23 +3,102 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
 <mapper namespace="com.foodtoeat.mapper.FoodMapper">
 
-    <select id="pageQuery" resultType="com.foodtoeat.pojo.entity.Food">
-        SELECT * FROM foods
-        order by name desc
-        LIMIT #{pageSize}
-        OFFSET #{offset}
-    </select>
-    <select id="getFoodByCategory"
-            parameterType="com.foodtoeat.pojo.dto.FoodCategoryFilterDTO"
-            resultType="com.foodtoeat.pojo.entity.Food">
-        SELECT * FROM foods
+    <resultMap id="foodVOResultMap" type="com.foodtoeat.pojo.vo.FoodVO">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="description" property="description"/>
+        <result column="cuisine" property="cuisine"/>
+        <result column="image_url" property="imageUrl"/>
+        <result column="types" property="types" typeHandler="com.foodtoeat.mapper.typehandler.StringArrayListTypeHandler"/>
+        <result column="ingredients" property="ingredients" typeHandler="com.foodtoeat.mapper.typehandler.StringArrayListTypeHandler"/>
+        <result column="flavor" property="flavor" typeHandler="com.foodtoeat.mapper.typehandler.StringArrayListTypeHandler"/>
+    </resultMap>
+
+    <!-- Correlated arrays avoid multiplying foods when joining several many-to-many relationships. -->
+    <sql id="foodColumns">
+        foods.id, foods.name, foods.description, foods.image_url,
+        (SELECT name FROM cuisines WHERE id = foods.cuisine_id) AS cuisine,
+        ARRAY(SELECT t.name FROM types t JOIN food_types ft ON ft.type_id = t.id
+              WHERE ft.food_id = foods.id ORDER BY t.name) AS types,
+        ARRAY(SELECT i.name FROM ingredients i JOIN food_ingredients fi ON fi.ingredient_id = i.id
+              WHERE fi.food_id = foods.id ORDER BY i.name) AS ingredients,
+        ARRAY(SELECT f.name FROM flavors f JOIN food_flavors ff ON ff.flavor_id = f.id
+              WHERE ff.food_id = foods.id ORDER BY f.name) AS flavor
+    </sql>
+
+    <!-- Any selected value within a group; every selected group must match. -->
+    <sql id="pageFilters">
         <where>
-            <!-- Include foods with ALL included categories -->
+            <if test="name != null and name.trim() != ''">
+                AND foods.name ILIKE CONCAT('%', #{name}, '%')
+            </if>
+            <if test="description != null and description.trim() != ''">
+                AND foods.description ILIKE CONCAT('%', #{description}, '%')
+            </if>
+            <if test="imageUrl != null and imageUrl.trim() != ''">
+                AND foods.image_url = #{imageUrl}
+            </if>
+            <if test="cuisine != null and cuisine.trim() != ''">
+                AND EXISTS (SELECT 1 FROM cuisines c
+                            WHERE c.id = foods.cuisine_id AND LOWER(c.name) = LOWER(#{cuisine}))
+            </if>
+            <if test="types != null and types.size() > 0">
+                AND EXISTS (SELECT 1 FROM food_types ft JOIN types t ON t.id = ft.type_id
+                            WHERE ft.food_id = foods.id AND LOWER(t.name) IN
+                    <foreach collection="types" item="value" open="(" separator="," close=")">LOWER(#{value})</foreach>
+                )
+            </if>
+            <if test="ingredients != null and ingredients.size() > 0">
+                AND EXISTS (SELECT 1 FROM food_ingredients fi JOIN ingredients i ON i.id = fi.ingredient_id
+                            WHERE fi.food_id = foods.id AND LOWER(i.name) IN
+                    <foreach collection="ingredients" item="value" open="(" separator="," close=")">LOWER(#{value})</foreach>
+                )
+            </if>
+            <if test="flavor != null and flavor.size() > 0">
+                AND EXISTS (SELECT 1 FROM food_flavors ff JOIN flavors f ON f.id = ff.flavor_id
+                            WHERE ff.food_id = foods.id AND LOWER(f.name) IN
+                    <foreach collection="flavor" item="value" open="(" separator="," close=")">LOWER(#{value})</foreach>
+                )
+            </if>
+        </where>
+    </sql>
+
+    <select id="pageRows" resultMap="foodVOResultMap">
+        SELECT <include refid="foodColumns"/> FROM foods
+        <include refid="pageFilters"/>
+        ORDER BY foods.name DESC, foods.id DESC
+        LIMIT #{pageSize} OFFSET #{offset}
+    </select>
+
+    <select id="countByQuery" resultType="long">
+        SELECT COUNT(*) FROM foods
+        <include refid="pageFilters"/>
+    </select>
+
+    <select id="getFoodById" resultMap="foodVOResultMap">
+        SELECT <include refid="foodColumns"/> FROM foods WHERE foods.id = #{id}
+    </select>
+
+    <select id="getFoodBySearch" resultMap="foodVOResultMap">
+        SELECT <include refid="foodColumns"/> FROM foods
+        WHERE foods.name ILIKE CONCAT('%', #{keyword}, '%')
+        ORDER BY foods.name, foods.id
+    </select>
+
+    <select id="getRandomFood" resultMap="foodVOResultMap">
+        SELECT <include refid="foodColumns"/> FROM foods ORDER BY RANDOM() LIMIT 1
+    </select>
+    <select id="getRandomFoodByCategory"
+            parameterType="com.foodtoeat.pojo.dto.FoodCategoryFilterDTO"
+            resultMap="foodVOResultMap">
+        SELECT <include refid="foodColumns"/> FROM foods
+        <where>
+            <!-- Match ANY included category (OR). Empty includes impose no restriction. -->
             <if test="includeCategoryIds != null and includeCategoryIds.size() > 0">
-                foods.id IN (
+                AND EXISTS (
                 SELECT fc.food_id
-                FROM food_category fc
-                WHERE fc.category_id IN
+                FROM food_category_membership fc
+                WHERE fc.food_id = foods.id AND fc.category_id IN
                 <foreach collection="includeCategoryIds"
                          item="categoryId"
                          open="("
@@ -27,18 +106,15 @@
                          close=")">
                     #{categoryId}
                 </foreach>
-                GROUP BY fc.food_id
-                HAVING COUNT(DISTINCT fc.category_id)
-                = #{includeCategoryIds.size}
                 )
             </if>
 
-            <!-- Exclude foods with any excluded category -->
+            <!-- Require absence of EVERY excluded category (NOT A AND NOT B). -->
             <if test="excludeCategoryIds != null and excludeCategoryIds.size() > 0">
-                AND foods.id NOT IN (
+                AND NOT EXISTS (
                 SELECT fc.food_id
-                FROM food_category fc
-                WHERE fc.category_id IN
+                FROM food_category_membership fc
+                WHERE fc.food_id = foods.id AND fc.category_id IN
                 <foreach collection="excludeCategoryIds"
                          item="categoryId"
                          open="("
@@ -61,5 +137,8 @@
                 </foreach>
             </if>
         </where>
+        <!-- Return one random food after applying all category and rejection filters. -->
+        ORDER BY RANDOM()
+        LIMIT 1
     </select>
 </mapper>

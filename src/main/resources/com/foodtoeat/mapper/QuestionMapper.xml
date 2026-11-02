@@ -4,7 +4,7 @@
 <mapper namespace="com.foodtoeat.mapper.QuestionMapper">
     <select id="getNextQuestion"
             parameterType="java.util.List"
-            resultType="com.foodtoeat.pojo.entity.Question">
+            resultMap="questionResultMap">
         SELECT * FROM questions
         <where>
             <if test="askedQuestionIds != null and askedQuestionIds.size() > 0">

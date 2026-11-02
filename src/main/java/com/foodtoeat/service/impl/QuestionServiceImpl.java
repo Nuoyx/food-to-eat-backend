@@ -31,7 +31,12 @@ public class QuestionServiceImpl implements QuestionService {
                     "A positive question ID is required");
         }
 
-        return questionMapper.getCategoryIdByQuestionId(questionId);
+        Integer categoryId = questionMapper.getCategoryIdByQuestionId(questionId);
+        if (categoryId == null || categoryId <= 0) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Question has no valid category");
+        }
+        return categoryId;
     }
 
     @Override

@@ -5,7 +5,7 @@ import com.foodtoeat.pojo.dto.FoodDeciderRequestDTO;
 import com.foodtoeat.pojo.dto.FoodRecommendationRejectDTO;
 import com.foodtoeat.pojo.entity.DecisionSession;
 import com.foodtoeat.pojo.entity.DecisionSession.Stage;
-import com.foodtoeat.pojo.entity.Food;
+import com.foodtoeat.pojo.vo.FoodVO;
 import com.foodtoeat.pojo.entity.Question;
 import com.foodtoeat.pojo.vo.FoodDeciderResponseVO;
 import com.foodtoeat.service.FoodService;
@@ -43,6 +43,10 @@ public class RecommendationServiceImpl implements RecommendationService {
     @Override
     public FoodDeciderResponseVO startDecision() {
         Question question = questionService.getFirstQuestion();
+        if (question == null) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "No recommendation questions are available");
+        }
 
         UUID sessionId = UUID.randomUUID();
         DecisionSession session = new DecisionSession();
@@ -59,6 +63,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         }
         UUID sessionId = request.getSessionId();
         DecisionSession session = loadSession(sessionId);
+        requireStage(session, Stage.AWAITING_ANSWER);
 
         Integer questionId = session.getCurrentQuestionId();
         if (questionId == null) {
@@ -67,7 +72,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         }
         // Keep earlier preferences and associate this answer with the pending question.
         session.getAnswers().put(questionId, request.getAnswer());
-        Food recommendation = foodService.getFoodByCategory(buildFilter(session));
+        FoodVO recommendation = foodService.getRandomFoodByCategory(buildFilter(session));
         // The question is complete; feedback is only valid if a food was found.
         session.setCurrentQuestionId(null);
         session.setStage(recommendation == null ? Stage.EXHAUSTED : Stage.AWAITING_FEEDBACK);
@@ -83,6 +88,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         }
         UUID sessionId = request.getSessionId();
         DecisionSession session = loadSession(sessionId);
+        requireStage(session, Stage.AWAITING_FEEDBACK);
 
         session.getRejectedFoodIds().add(request.getFoodId());
         // Answered question IDs also serve as the list of questions to avoid repeating.
@@ -97,13 +103,22 @@ public class RecommendationServiceImpl implements RecommendationService {
 
     @Override
     public void acceptRecommendation(UUID sessionId) {
+        DecisionSession session = loadSession(sessionId);
+        requireStage(session, Stage.AWAITING_FEEDBACK);
         // Acceptance completes the flow, so its temporary state is no longer needed.
         redisTemplate.delete(sessionKey(sessionId));
     }
 
     @Override
-    public Food random() {
+    public FoodVO random() {
         return foodService.random();
+    }
+
+    private void requireStage(DecisionSession session, Stage expected) {
+        if (session.getStage() != expected) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "This action is not allowed during " + session.getStage());
+        }
     }
 
     private DecisionSession loadSession(UUID sessionId) {
@@ -143,7 +158,7 @@ public class RecommendationServiceImpl implements RecommendationService {
                 throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                         "Answered question has no category");
             }
-            // Yes requires the category; no excludes the category
+            // Yes adds an OR option; every no remains an exclusion.
             if (answer.getValue()) {
                 included.add(categoryId);
             } else {
@@ -158,7 +173,7 @@ public class RecommendationServiceImpl implements RecommendationService {
     }
 
     private FoodDeciderResponseVO response(UUID sessionId, DecisionSession session,
-                                           Question question, Food food) {
+                                           Question question, FoodVO food) {
         return FoodDeciderResponseVO.builder()
                 .sessionId(sessionId)
                 .stage(session.getStage())
